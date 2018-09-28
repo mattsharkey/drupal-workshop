@@ -1,0 +1,21 @@
+workshop.index:
+  path: '/_workshop/{theme}'
+  defaults:
+    _controller: '\Drupal\workshop\Controller\WorkshopController::index'
+    _title: 'Workshop'
+  requirements:
+    _permission: 'access content'
+  options:
+    no_cache: TRUE
+    _admin_route: TRUE
+    _no_big_pipe: TRUE
+workshop.component:
+  path: '/_workshop/{theme}/component'
+  defaults:
+    _controller: '\Drupal\workshop\Controller\WorkshopController::component'
+    _title: 'Workshop'
+  requirements:
+    _permission: 'access content'
+  options:
+    no_cache: TRUE
+    _no_big_pipe: TRUE

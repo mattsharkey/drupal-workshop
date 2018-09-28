@@ -1,0 +1,12 @@
+{
+    "name": "creativeservices/workshop",
+    "type": "drupal-module",
+    "license": "NCSA",
+    "authors": [
+        {
+            "name": "Matt Sharkey",
+            "email": "msharkey@illinois.edu"
+        }
+    ],
+    "require": {}
+}
