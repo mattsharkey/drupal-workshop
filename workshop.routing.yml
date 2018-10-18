@@ -1,7 +1,7 @@
 workshop.index:
   path: '/_workshop/{theme}'
   defaults:
-    _controller: '\Drupal\workshop\Controller\WorkshopController::index'
+    _controller: '\Drupal\workshop\Controller\WorkshopController::viewIndex'
     _title: 'Workshop'
   requirements:
     _permission: 'access content'
@@ -9,10 +9,10 @@ workshop.index:
     no_cache: TRUE
     _admin_route: TRUE
     _no_big_pipe: TRUE
-workshop.component:
-  path: '/_workshop/{theme}/component'
+workshop.template:
+  path: '/_workshop/{theme}/template'
   defaults:
-    _controller: '\Drupal\workshop\Controller\WorkshopController::component'
+    _controller: '\Drupal\workshop\Controller\WorkshopController::viewTemplate'
     _title: 'Workshop'
   requirements:
     _permission: 'access content'

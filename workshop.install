@@ -1,0 +1,15 @@
+<?php
+
+function workshop_requirements($phase)
+{
+    $requirements = [];
+    if ($phase == 'runtime' && php_sapi_name() != 'cli-server') {
+        $requirements['workshop'] = [
+            'title' => 'Workshop',
+            'value' => 'Enabled',
+            'severity' => REQUIREMENT_WARNING,
+            'description' => "The Workshop module should only be enabled in development environments.",
+        ];
+    }
+    return $requirements;
+}

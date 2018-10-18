@@ -3,47 +3,80 @@
 namespace Drupal\workshop\Template;
 
 use Drupal\workshop\Theme\ThemeInterface;
-use Traversable;
+use Eloquent\Pathogen\FileSystem\FileSystemPath;
+use Eloquent\Pathogen\PathInterface;
 
-class TemplateCollection implements TemplateCollectionInterface, \Countable, \IteratorAggregate
+class TemplateCollection implements TemplateCollectionInterface, \IteratorAggregate
 {
-    private $templates = [];
+    private $templates;
 
-    public static function forTheme(ThemeInterface $theme)
-    {
-        $dir = $theme->getTemplatesPath();
-        if (!is_dir($dir)) {
-            throw new \DomainException("Not a directory: $dir");
-        }
-        $iterator = new TemplateFilterIterator(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir)));
-        $collection = new static();
-        foreach ($iterator as $file) {
-            $name = $iterator->getInnerIterator()->getInnerIterator()->getSubPathname();
-            $collection->templates[$name] = new Template($theme, $name, $file);
-        }
-        return $collection;
-    }
+    private $theme;
 
-    public function count()
+    public function __construct(ThemeInterface $theme)
     {
-        return count($this->getTemplates());
-    }
-
-    public function get($name)
-    {
-        if (!isset($this->templates[$name])) {
-            throw new \Exception("Unknown template: $name");
-        }
-        return $this->templates[$name];
+        $this->theme = $theme;
+        $this->findTemplates();
     }
 
     public function getIterator()
     {
-        return new \ArrayIterator($this->getTemplates());
+        return new \ArrayIterator($this->templates);
     }
 
-    public function getTemplates()
+    public function sort($field, $order)
     {
-        return $this->templates;
+        $cmp = function (TemplateInterface $a, TemplateInterface $b) use ($field, $order) {
+            switch ($field) {
+                case 'Modified':
+                    $aField = $a->getTime();
+                    $bField = $b->getTime();
+                    break;
+                case 'Template':
+                default:
+                    $aField = $a->getName();
+                    $bField = $b->getName();
+            }
+            $ret = strnatcasecmp($aField, $bField);
+            return $order == 'desc' ? (0 - $ret) : $ret;
+        };
+        return usort($this->templates, $cmp);
+    }
+
+    private function findTemplates()
+    {
+        $this->templates = [];
+        $dirPath = $this->getTemplatesDirectory();
+        if (is_dir($dirPath)) {
+            $dir = FileSystemPath::fromString(realpath($dirPath));
+            foreach ($this->makeTemplatesIterator($dir) as $file) {
+                $path = FileSystemPath::fromString($file->getRealpath());
+                $this->templates[] = new Template($path->relativeTo($dir)->string(), $file);
+            }
+        }
+    }
+
+    private function getTemplatesDirectory()
+    {
+        return $this->theme->getWorkshopPath();
+    }
+
+    /**
+     * @param \Iterator $files
+     * @return \RegexIterator
+     */
+    private function makeTemplateFilter(\Iterator $files)
+    {
+        return new \RegexIterator($files, '|\.twig$|');
+    }
+
+    /**
+     * @var PathInterface $path
+     * @return \RegexIterator
+     */
+    private function makeTemplatesIterator(PathInterface $path)
+    {
+        $dir = new \RecursiveDirectoryIterator($path->string(), \RecursiveDirectoryIterator::SKIP_DOTS);
+        $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::LEAVES_ONLY);
+        return $this->makeTemplateFilter($files);
     }
 }

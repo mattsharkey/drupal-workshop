@@ -2,26 +2,22 @@
 
 namespace Drupal\workshop\Controller;
 
+use CreativeServices\Fixtures\File\FixtureCollectionDirectory;
+use CreativeServices\Fixtures\Twig\FixtureFunction;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Render\HtmlResponse;
-use Drupal\Core\Template\Attribute;
 use Drupal\Core\Template\TwigEnvironment;
 use Drupal\Core\Url;
-use Drupal\workshop\Fixture\FixtureInterface;
+use Drupal\workshop\Template\TemplateCollection;
 use Drupal\workshop\Template\TemplateInterface;
 use Drupal\workshop\Theme\Theme;
 use Drupal\workshop\Theme\ThemeInterface;
-use Labcoat\Environment\Environment;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class WorkshopController extends ControllerBase
 {
-    /**
-     * @var Environment
-     */
-    private $labcoat;
-
     /**
      * @var TwigEnvironment
      */
@@ -37,13 +33,14 @@ class WorkshopController extends ControllerBase
     public function __construct(TwigEnvironment $twig)
     {
         $this->twig = $twig;
-        $this->labcoat = new Environment($twig);
     }
 
-    public function index(Request $request, $theme)
+    public function viewIndex(Request $request, $theme)
     {
-        $sortField = $request->query->get('order');
-        $sortOrder = $request->query->get('sort');
+        $theme = $this->getTheme($theme);
+        $templates = new TemplateCollection($theme);
+        $templates->sort($request->query->get('order'), $request->query->get('sort'));
+
         $table = [
             '#type' => 'table',
             '#header' => [
@@ -56,22 +53,21 @@ class WorkshopController extends ControllerBase
                     'field' => 'time',
                     'sort' => 'desc',
                 ],
-                'Fixtures',
             ],
             '#rows' => [],
         ];
-        $rows = $this->getComponentRows($theme, $sortField, $sortOrder);
-        foreach ($rows as $row) {
+        foreach ($templates as $template) {
             $table['#rows'][] = [
                 'data' => [
                     [
-                        'data' => $row['name'],
+                        'data' => [
+                            '#type' => 'link',
+                            '#title' => $template,
+                            '#url' => $this->makeTemplateLink($theme, $template),
+                        ],
                     ],
                     [
-                        'data' => $this->formatInterval($row['time']) . ' ago',
-                    ],
-                    [
-                        'data' => $row['fixtures'],
+                        'data' => $this->formatInterval($template->getTime()) . ' ago',
                     ],
                 ],
             ];
@@ -79,78 +75,36 @@ class WorkshopController extends ControllerBase
         return $table;
     }
 
-    public function component(Request $request, $theme)
+    /**
+     * @param Request $request
+     * @param string $theme
+     * @return HtmlResponse|Response
+     * @throws \Exception
+     */
+    public function viewTemplate(Request $request, $theme)
     {
         if (!$request->query->has('template')) {
             throw new \Exception("Unspecified template");
         }
-        if (!$request->query->has('fixture')) {
-            throw new \Exception("Unspecified fixture");
-        }
         $theme = $this->getTheme($theme);
-        $template = $theme->getTemplate($request->query->get('template'));
-        $fixture = $template->getFixture($request->query->get('fixture'));
-        $rendered = $this->labcoat->render($fixture);
-
-        $html = [
-            '#type' => 'html',
-            'page' => [
-                '#type' => 'page',
-                '#title' => 'Workshop',
-            ],
-        ];
-
-        foreach ($theme->getRegions() as $name => $desc) {
-            $html['page'][$name] = [
-                '#theme_wrappers' => ['region'],
-                '#region' => $name,
-            ];
-            if ($name === $fixture->getRegion()) {
-                $html['page'][$name]['#markup'] = $rendered;
-            } else {
-                $html['page'][$name]['#children'] = [
-                    '#theme' => 'workshop_region_placeholder',
-                    '#region' => $name,
-                    '#label' => $desc,
-                    '#attached' => [
-                        'library' => ['workshop/workshop']
-                    ]
-                ];
-            }
+        $twig = clone $this->twig;
+        $fixtures = new FixtureCollectionDirectory($theme->getFixturesPath());
+        $twig->addFunction(new FixtureFunction($fixtures));
+        $template = $this->makeTemplateName($theme, $request->query->get('template'));
+        $context = _template_preprocess_default_variables();
+        try {
+            $rendered = $twig->render($template, $context);
+            return $this->makeHtmlResponse($rendered, $theme->getWorkshopLibraries());
+        } catch (\Twig_Error_Syntax $e) {
+            return $this->makeSyntaxErrorResponse($e);
+        } catch (\Twig_Error $e) {
+            return $this->makeErrorResponse($e);
         }
-
-        $renderer = \Drupal::service('renderer');
-        $processor = \Drupal::service('html_response.attachments_processor');
-
-        system_page_attachments($html['page']);
-        $renderer->renderRoot($html);
-        $response = new HtmlResponse($html);
-        $response = $processor->processAttachments($response);
-
-        return $response;
     }
 
     private function formatInterval($time) {
         $interval = time() - $time;
         return \Drupal::service('date.formatter')->formatInterval($interval);
-    }
-
-    private function getComponentRows($theme, $sortField = null, $sortOrder = null)
-    {
-        $theme = $this->getTheme($theme);
-        $rows = [];
-        foreach ($theme->getTemplates() as $template) {
-            if (!$template->hasFixtures()) {
-                continue;
-            }
-            $rows[] = [
-                'name' => $template->getName(),
-                'time' => $template->getFile()->getMTime(),
-                'fixtures' => $this->makeFixtureLinks($template),
-            ];
-        }
-        // Sort rows
-        return $rows;
     }
 
     /**
@@ -162,30 +116,103 @@ class WorkshopController extends ControllerBase
         return new Theme($name);
     }
 
-    private function makeComponentLink(FixtureInterface $fixture)
-    {
-        $params = [
-            'theme' => $fixture->getTheme()->getName(),
-            'template' => $fixture->getTemplate()->getName(),
-            'fixture' => $fixture->getName(),
-        ];
-        return Url::fromRoute('workshop.component', $params);
+    private function makeErrorResponse(\Twig_Error $error) {
+        $context = $error->getSourceContext();
+        $html = <<<HTML
+<!DOCTYPE html>
+<html>
+
+<title>Error</title>
+
+<h1>{$error->getMessage()}</h1>
+
+<dl>
+    <dt>Template</dt>
+    <dd>{$context->getName()}</dd>
+    <dt>File</dt>
+    <dd>{$context->getPath()}</dd>
+</dl>
+
+<pre style="background-color:#f0f0f0">{$context->getCode()}</pre>
+
+<p>{$error->getFile()}, line {$error->getLine()}</p>
+
+</html>
+HTML;
+        return new Response($html, 500);
     }
 
-    private function makeFixtureLinks(TemplateInterface $template)
+    private function makeHtmlResponse($content, $libraries = [])
     {
-        $list = [
-            '#theme' => 'item_list',
-            '#items' => [],
+        $renderer = \Drupal::service('renderer');
+        $processor = \Drupal::service('html_response.attachments_processor');
+
+        $replaceRendered = function () use ($content) {
+            return $content;
+        };
+
+        $html = [
+            '#type' => 'html',
+            'page' => [
+                '#title' => 'Workshop',
+                '#markup' => $content,
+                '#post_render' => [$replaceRendered],
+            ]
         ];
-        foreach ($template->getFixtures() as $fixture) {
-            $link = [
-                '#type' => 'link',
-                '#title' => $fixture->getName(),
-                '#url' => $this->makeComponentLink($fixture),
-            ];
-            $list['#items'][] = $link;
+        if ($libraries) {
+            $html['page']['#attached']['library'] = $libraries;
         }
-        return $list;
+
+        system_page_attachments($html['page']);
+        $renderer->renderRoot($html);
+
+        $response = new HtmlResponse();
+        $response->setContent($html);
+
+        $response = $processor->processAttachments($response);
+        return $response;
+    }
+
+    private function makeTemplateLink(ThemeInterface $theme, TemplateInterface $template)
+    {
+        $params = [
+            'theme' => $theme->getName(),
+            'template' => $template->getName(),
+        ];
+        return Url::fromRoute('workshop.template', $params);
+    }
+
+    private function makeTemplateName(ThemeInterface $theme, $template)
+    {
+        $segments = [$theme->getName(), $theme->getWorkshopDirectory(), $template];
+        return '@' . implode(DIRECTORY_SEPARATOR, array_filter($segments));
+    }
+
+    private function makeSyntaxErrorResponse(\Twig_Error_Syntax $error) {
+        $context = $error->getSourceContext();
+        $html = <<<HTML
+<!DOCTYPE html>
+<html>
+
+<title>Syntax error</title>
+
+<h1>Syntax error</h1>
+
+<p>{$error->getMessage()}</p>
+
+<dl>
+    <dt>Template</dt>
+    <dd>{$context->getName()}</dd>
+    <dt>File</dt>
+    <dd>{$context->getPath()}</dd>
+</dl>
+
+<pre style="background-color:#f0f0f0">{$context->getCode()}</pre>
+
+<p>{$error->getFile()}, line {$error->getLine()}</p>
+
+</html>
+HTML;
+        return new Response($html, 500);
     }
 }

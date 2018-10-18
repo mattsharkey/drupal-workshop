@@ -2,61 +2,21 @@
 
 namespace Drupal\workshop\Template;
 
-use Drupal\workshop\Fixture\FixtureCollection;
-use Drupal\workshop\Fixture\FixtureCollectionInterface;
-use Drupal\workshop\Theme\ThemeInterface;
-
 class Template implements TemplateInterface
 {
-    const EXTENSION = '.twig';
-
     private $file;
-
-    /**
-     * @var FixtureCollectionInterface
-     */
-    private $fixtures;
 
     private $name;
 
-    private $theme;
-
-    public function __construct(ThemeInterface $theme, $name, \SplFileInfo $file)
+    public function __construct($name, \SplFileInfo $file)
     {
-        $this->theme = $theme;
         $this->name = $name;
         $this->file = $file;
-        $this->fixtures = FixtureCollection::forTemplate($this);
     }
 
-    public function __debugInfo()
+    public function __toString()
     {
-        return [
-            'name' => $this->name,
-            'file' => $this->file,
-            'fixtures' => $this->getFixturesPath(),
-            'hasFixtures' => $this->hasFixtures(),
-        ];
-    }
-
-    public function getFile()
-    {
-        return $this->file;
-    }
-
-    public function getFixture($name)
-    {
-        return $this->fixtures->get($name);
-    }
-
-    public function getFixtures()
-    {
-        return FixtureCollection::forTemplate($this);
-    }
-
-    public function getFixturesPath()
-    {
-        return $this->file->getPath() . DIRECTORY_SEPARATOR . $this->file->getBasename(static::EXTENSION) . '.yml';
+        return (string)$this->getName();
     }
 
     public function getName()
@@ -64,13 +24,8 @@ class Template implements TemplateInterface
         return $this->name;
     }
 
-    public function getTheme()
+    public function getTime()
     {
-        return $this->theme;
-    }
-
-    public function hasFixtures()
-    {
-        return is_file($this->getFixturesPath());
+        return $this->file->getMTime();
     }
 }

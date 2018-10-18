@@ -1,5 +1,0 @@
-workshop:
-  version: 1.x
-  css:
-    component:
-      css/workshop-component.css: {}
