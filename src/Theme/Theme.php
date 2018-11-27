@@ -2,13 +2,20 @@
 
 namespace Drupal\workshop\Theme;
 
+use CreativeServices\Workshop\Template\File\TemplateDirectory;
 use Drupal\Core\Extension\Extension;
 use Symfony\Component\Yaml\Yaml;
 
 class Theme implements ThemeInterface
 {
+    /**
+     * @var array
+     */
     private $info;
 
+    /**
+     * @var string
+     */
     private $name;
 
     /**
@@ -41,6 +48,11 @@ class Theme implements ThemeInterface
         return $this->name;
     }
 
+    public function getTemplates()
+    {
+        return new TemplateDirectory($this->getWorkshopPath());
+    }
+
     public function getTemplatesPath()
     {
         return $this->makePath($this->getTemplatesDirectory());
@@ -67,40 +79,62 @@ class Theme implements ThemeInterface
         return $this->makePath($this->getTemplatesDirectory(), $this->getWorkshopDirectory());
     }
 
+    /**
+     * @param string $name
+     * @return string
+     */
     public function makeTemplateName($name)
     {
         return '@' . $this->getName() . DIRECTORY_SEPARATOR . $name;
     }
 
+    /**
+     * @return array
+     */
     private function getInfo()
     {
         if (!isset($this->info)) {
-            $this->info = Yaml::parse(file_get_contents($this->getInfoPath()));
+            $this->info = Yaml::parseFile($this->getInfoPath());
         }
         return $this->info;
     }
 
+    /**
+     * @return string
+     */
     private function getInfoPath()
     {
         return implode(DIRECTORY_SEPARATOR, [DRUPAL_ROOT, $this->theme->getPathname()]);
     }
 
+    /**
+     * @return string
+     */
     private function getPath()
     {
         return $this->theme->getPath();
     }
 
+    /**
+     * @return string
+     */
     private function getTemplatesDirectory()
     {
         return 'templates';
     }
 
+    /**
+     * @return array
+     */
     private function getWorkshopInfo()
     {
         $info = $this->getInfo();
         return isset($info['workshop']) ? $info['workshop'] : [];
     }
 
+    /**
+     * @return string
+     */
     private function makePath()
     {
         $segments = func_get_args();

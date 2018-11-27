@@ -4,7 +4,7 @@ workshop.index:
     _controller: '\Drupal\workshop\Controller\WorkshopController::viewIndex'
     _title: 'Workshop'
   requirements:
-    _permission: 'access content'
+    _permission: 'access administration pages'
   options:
     no_cache: TRUE
     _admin_route: TRUE
@@ -15,7 +15,6 @@ workshop.template:
     _controller: '\Drupal\workshop\Controller\WorkshopController::viewTemplate'
     _title: 'Workshop'
   requirements:
-    _permission: 'access content'
+    _permission: 'access administration pages'
   options:
-    no_cache: TRUE
     _no_big_pipe: TRUE

@@ -1,5 +1,5 @@
 {
-  "name": "creativeservices/workshop",
+  "name": "creativeservices/drupal-workshop",
   "type": "drupal-module",
   "license": "NCSA",
   "authors": [
@@ -10,6 +10,7 @@
   ],
   "require": {
     "drupal/core": "~8",
-    "creativeservices/fixtures": "dev-master"
+    "creativeservices/workshop": "^1.0@beta",
+    "creativeservices/fixtures": "^1.0@beta"
   }
 }

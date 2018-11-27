@@ -8,6 +8,8 @@ interface ThemeInterface
 
     public function getFixturesPath();
 
+    public function getTemplates();
+
     public function getTemplatesPath();
 
     public function getWorkshopDirectory();
